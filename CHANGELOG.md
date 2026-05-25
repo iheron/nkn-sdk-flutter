@@ -1,3 +1,7 @@
+## 0.7.0
+
+* Add cross send policy
+
 ## 0.6.2
 
 * Fix gomobile compatibility issues

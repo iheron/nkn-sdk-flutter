@@ -175,6 +175,34 @@ class _MyAppState extends State<MyApp> {
                           event.reply(jsonEncode({'id': DateTime.now().millisecondsSinceEpoch.toString(), 'contentType': 'text', 'content': 'reply'}));
                         }
                       });
+
+                      _client1?.onMessageEvent.listen((event) {
+                        print('------onMessageEvent1-----');
+                        print('Type: ${event.type}');
+                        print('ClientAddr: ${event.clientAddr}');
+                        if (event.subClientID != null) {
+                          print('SubClientID: ${event.subClientID}');
+                        }
+                        if (event.destinations != null && event.destinations!.isNotEmpty) {
+                          print('Destinations: ${event.destinations}');
+                        }
+                        if (event.src != null && event.src!.isNotEmpty) {
+                          print('Src: ${event.src}');
+                        }
+                        if (event.messageId != null) {
+                          print('MessageID: ${hexEncode(event.messageId!)}');
+                        }
+                        print('MessageType: ${event.messageType}');
+                        print('Encrypted: ${event.encrypted}');
+                        print('DataSize: ${event.dataSize}');
+                        print('NoReply: ${event.noReply}');
+                        if (event.error != null) {
+                          print('Error: ${event.error}');
+                        }
+                        if (event.timestamp != null) {
+                          print('Timestamp: ${event.timestamp}');
+                        }
+                      });
                     },
                     child: Text('create'),
                   ),
@@ -277,6 +305,34 @@ class _MyAppState extends State<MyApp> {
                         print(event.messageId);
                         print(event.data);
                         print(event.src);
+                      });
+
+                      _client2?.onMessageEvent.listen((event) {
+                        print('------onMessageEvent2-----');
+                        print('Type: ${event.type}');
+                        print('ClientAddr: ${event.clientAddr}');
+                        if (event.subClientID != null) {
+                          print('SubClientID: ${event.subClientID}');
+                        }
+                        if (event.destinations != null && event.destinations!.isNotEmpty) {
+                          print('Destinations: ${event.destinations}');
+                        }
+                        if (event.src != null && event.src!.isNotEmpty) {
+                          print('Src: ${event.src}');
+                        }
+                        if (event.messageId != null) {
+                          print('MessageID: ${hexEncode(event.messageId!)}');
+                        }
+                        print('MessageType: ${event.messageType}');
+                        print('Encrypted: ${event.encrypted}');
+                        print('DataSize: ${event.dataSize}');
+                        print('NoReply: ${event.noReply}');
+                        if (event.error != null) {
+                          print('Error: ${event.error}');
+                        }
+                        if (event.timestamp != null) {
+                          print('Timestamp: ${event.timestamp}');
+                        }
                       });
                     },
                     child: Text('create'),

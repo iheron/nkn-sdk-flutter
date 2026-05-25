@@ -19,9 +19,11 @@
 @class NknClient;
 @class NknClientAddr;
 @class NknClientConfig;
+@class NknClientStats;
 @class NknDialConfig;
 @class NknMessage;
 @class NknMessageConfig;
+@class NknMessageEvent;
 @class NknMultiClient;
 @class NknNanoPay;
 @class NknNanoPayClaimer;
@@ -30,9 +32,11 @@
 @class NknOnConnect;
 @class NknOnError;
 @class NknOnMessage;
+@class NknOnMessageEvent;
 @class NknRPCConfig;
 @class NknRegistrant;
 @class NknScryptConfig;
+@class NknSubClientConnEvent;
 @class NknSubscribers;
 @class NknSubscription;
 @class NknTransactionConfig;
@@ -44,6 +48,8 @@
 @class NknOnConnectFunc;
 @protocol NknOnErrorFunc;
 @class NknOnErrorFunc;
+@protocol NknOnMessageEventFunc;
+@class NknOnMessageEventFunc;
 @protocol NknOnMessageFunc;
 @class NknOnMessageFunc;
 @protocol NknRPCConfigInterface;
@@ -62,6 +68,10 @@
 
 @protocol NknOnErrorFunc <NSObject>
 - (void)onError:(NSError* _Nullable)p0;
+@end
+
+@protocol NknOnMessageEventFunc <NSObject>
+- (void)onMessageEvent:(NknMessageEvent* _Nullable)p0;
 @end
 
 @protocol NknOnMessageFunc <NSObject>
@@ -154,9 +164,12 @@ optional client config. For any zero value field in config, the default
 client config value will be used. If config is nil, the default client config
 will be used.
  */
-- (nullable instancetype)init:(NknAccount* _Nullable)account identifier:(NSString* _Nullable)identifier config:(NknClientConfig* _Nullable)config;
+- (nullable instancetype)init:(NknAccount* _Nullable)account identifier:(NSString* _Nullable)identifier cfg:(NknClientConfig* _Nullable)cfg;
 @property (nonatomic) NknOnConnect* _Nullable onConnect;
 @property (nonatomic) NknOnMessage* _Nullable onMessage;
+@property (nonatomic) NknOnMessageEvent* _Nullable onMessageEvent;
+@property (nonatomic) int32_t state;
+@property (nonatomic) NknClientStats* _Nullable stats;
 /**
  * Account returns the account of the client.
  */
@@ -416,6 +429,7 @@ compatibility.
 @property (nonatomic) int32_t webRTCConnectTimeout;
 @property (nonatomic) long multiClientNumClients;
 @property (nonatomic) BOOL multiClientOriginalClient;
+@property (nonatomic) int32_t crossSendPolicy;
 /**
  * RPCGetConcurrency returns RPC concurrency. RPC prefix is added to avoid
 gomobile compile error.
@@ -433,6 +447,21 @@ avoid gomobile compile error.
 added to avoid gomobile compile error.
  */
 - (NkngomobileStringArray* _Nullable)rpcGetSeedRPCServerAddr;
+@end
+
+/**
+ * ClientStats tracks statistics for a client to calculate stability score
+ */
+@interface NknClientStats : NSObject <goSeqRefInterface> {
+}
+@property(strong, readonly) _Nonnull id _ref;
+
+- (nonnull instancetype)initWithRef:(_Nonnull id)ref;
+- (nonnull instancetype)init;
+@property (nonatomic) int64_t connectTime;
+@property (nonatomic) long reconnectCount;
+@property (nonatomic) int64_t lastReconnect;
+@property (nonatomic) long sendFailureCount;
 @end
 
 /**
@@ -499,6 +528,29 @@ compatibility.
 @end
 
 /**
+ * MessageEvent contains information about a message send or receive event
+ */
+@interface NknMessageEvent : NSObject <goSeqRefInterface> {
+}
+@property(strong, readonly) _Nonnull id _ref;
+
+- (nonnull instancetype)initWithRef:(_Nonnull id)ref;
+- (nonnull instancetype)init;
+@property (nonatomic) int32_t type;
+@property (nonatomic) NSString* _Nonnull clientAddr;
+@property (nonatomic) int32_t subClientID;
+@property (nonatomic) NkngomobileStringArray* _Nullable destinations;
+@property (nonatomic) NSString* _Nonnull src;
+@property (nonatomic) NSData* _Nullable messageID;
+@property (nonatomic) int32_t messageType;
+@property (nonatomic) BOOL encrypted;
+@property (nonatomic) long dataSize;
+@property (nonatomic) BOOL noReply;
+@property (nonatomic) NSError* _Nullable error;
+@property (nonatomic) int64_t timestamp;
+@end
+
+/**
  * MultiClient sends and receives data using multiple NKN clients concurrently
 to improve reliability and latency. In addition, it supports session mode, a
 reliable streaming protocol similar to TCP based on ncp
@@ -522,13 +574,14 @@ Deprecated:  Use NewMultiClientV2 instead.
 - (nullable instancetype)init:(NknAccount* _Nullable)account baseIdentifier:(NSString* _Nullable)baseIdentifier numSubClients:(long)numSubClients originalClient:(BOOL)originalClient config:(NknClientConfig* _Nullable)config;
 /**
  * NewMultiClientV2 creates a MultiClient with an account, an optional identifier,
-and a optional client config. For any zero value field in config, the default
+and an optional client config. For any zero value field in config, the default
 client config value will be used. If config is nil, the default client config
 will be used.
  */
 - (nullable instancetype)initV2:(NknAccount* _Nullable)account identifier:(NSString* _Nullable)identifier config:(NknClientConfig* _Nullable)config;
 @property (nonatomic) NknOnConnect* _Nullable onConnect;
 @property (nonatomic) NknOnMessage* _Nullable onMessage;
+@property (nonatomic) NknOnMessageEvent* _Nullable onMessageEvent;
 // skipped method MultiClient.Accept with unsupported parameter or return types
 
 /**
@@ -572,6 +625,8 @@ vice versa.
 
 // skipped method MultiClient.BalanceContext with unsupported parameter or return types
 
+// skipped method MultiClient.CalculateClientScore with unsupported parameter or return types
+
 /**
  * Close closes the multiclient, including all clients it created and all
 sessions dialed and accepted. Calling close multiple times is allowed and
@@ -597,10 +652,17 @@ in config, this default dial config value of this multiclient will be used.
 If config is nil, the default dial config of this multiclient will be used.
  */
 - (NcpSession* _Nullable)dialWithConfig:(NSString* _Nullable)remoteAddr config:(NknDialConfig* _Nullable)config error:(NSError* _Nullable* _Nullable)error;
+// skipped method MultiClient.GetAllSubConnStates with unsupported parameter or return types
+
 /**
  * GetClient returns a client with a given index.
  */
 - (NknClient* _Nullable)getClient:(long)i;
+/**
+ * GetClientStats returns connection statistics for a specific client.
+This is useful for understanding which client will be selected by CrossSendPolicyPreferStable.
+ */
+- (NknClientStats* _Nullable)getClientStats:(long)clientID;
 // skipped method MultiClient.GetClients with unsupported parameter or return types
 
 /**
@@ -976,6 +1038,37 @@ empty.
 @end
 
 /**
+ * OnMessageEvent is a wrapper type for gomobile compatibility.
+ */
+@interface NknOnMessageEvent : NSObject <goSeqRefInterface> {
+}
+@property(strong, readonly) _Nonnull id _ref;
+
+- (nonnull instancetype)initWithRef:(_Nonnull id)ref;
+/**
+ * NewOnMessageEvent creates an OnMessageEvent channel with a channel size and callback
+function.
+ */
+- (nullable instancetype)init:(long)size cb:(id<NknOnMessageEventFunc> _Nullable)cb;
+// skipped field OnMessageEvent.C with unsupported type: chan *github.com/nknorg/nkn-sdk-go.MessageEvent
+
+@property (nonatomic) id<NknOnMessageEventFunc> _Nullable callback;
+/**
+ * MaybeNext returns the next element in the channel, or nil if channel is
+empty.
+ */
+- (NknMessageEvent* _Nullable)maybeNext;
+/**
+ * Next waits and returns the next element from the channel.
+ */
+- (NknMessageEvent* _Nullable)next;
+/**
+ * NextWithTimeout waits and returns the next element from the channel, timeout in millisecond.
+ */
+- (NknMessageEvent* _Nullable)nextWithTimeout:(int32_t)timeout;
+@end
+
+/**
  * RPCConfig is the rpc call configuration.
  */
 @interface NknRPCConfig : NSObject <goSeqRefInterface, NknRPCConfigInterface> {
@@ -1034,6 +1127,24 @@ added to avoid gomobile compile error.
 @property (nonatomic) long n;
 @property (nonatomic) long r;
 @property (nonatomic) long p;
+@end
+
+/**
+ * SubClientConnEvent contains connection state information for a sub-client
+ */
+@interface NknSubClientConnEvent : NSObject <goSeqRefInterface> {
+}
+@property(strong, readonly) _Nonnull id _ref;
+
+- (nonnull instancetype)initWithRef:(_Nonnull id)ref;
+- (nonnull instancetype)init;
+@property (nonatomic) NSString* _Nonnull baseAddress;
+@property (nonatomic) NSString* _Nonnull subAddress;
+@property (nonatomic) long index;
+@property (nonatomic) int32_t state;
+@property (nonatomic) NSError* _Nullable err;
+@property (nonatomic) NSString* _Nonnull nodeAddr;
+@property (nonatomic) NSString* _Nonnull nodeID;
 @end
 
 /**
@@ -1293,11 +1404,28 @@ FOUNDATION_EXPORT const int64_t NknAmountUnit;
  * Payload type alias for gomobile compatibility.
  */
 FOUNDATION_EXPORT const int32_t NknBinaryType;
+FOUNDATION_EXPORT const int32_t NknConnConnected;
+FOUNDATION_EXPORT const int32_t NknConnConnecting;
+FOUNDATION_EXPORT const int32_t NknConnDisconnected;
+FOUNDATION_EXPORT const int32_t NknCrossSendPolicyAllConnected;
+FOUNDATION_EXPORT const int32_t NknCrossSendPolicyAnyConnected;
+FOUNDATION_EXPORT const int32_t NknCrossSendPolicyNone;
+FOUNDATION_EXPORT const int32_t NknCrossSendPolicyPreferStable;
 /**
  * DefaultSessionAllowAddr is the default session allow address if none is
 provided when calling listen.
  */
 FOUNDATION_EXPORT NSString* _Nonnull const NknDefaultSessionAllowAddr;
+// skipped const MessageEventTypeReceive with unsupported type: github.com/nknorg/nkn-sdk-go.MessageEventType
+
+// skipped const MessageEventTypeReceiveReply with unsupported type: github.com/nknorg/nkn-sdk-go.MessageEventType
+
+// skipped const MessageEventTypeSend with unsupported type: github.com/nknorg/nkn-sdk-go.MessageEventType
+
+// skipped const MessageEventTypeSendFailed with unsupported type: github.com/nknorg/nkn-sdk-go.MessageEventType
+
+// skipped const MessageEventTypeSendSuccess with unsupported type: github.com/nknorg/nkn-sdk-go.MessageEventType
+
 /**
  * MessageIDSize is the default message id size in bytes
  */
@@ -1665,7 +1793,7 @@ FOUNDATION_EXPORT NknClientConfig* _Nullable NknMergeClientConfig(NknClientConfi
 
 /**
  * MergeDialConfig merges a given dial config with the default dial config
-recursively. Any non zero value fields will override the default config.
+recursively. Any non-zero value fields will override the default config.
  */
 FOUNDATION_EXPORT NknDialConfig* _Nullable NknMergeDialConfig(NcpConfig* _Nullable baseSessionConfig, NknDialConfig* _Nullable conf, NSError* _Nullable* _Nullable error);
 
@@ -1678,7 +1806,7 @@ FOUNDATION_EXPORT NknMessageConfig* _Nullable NknMergeMessageConfig(NknMessageCo
 
 /**
  * MergeTransactionConfig merges a given transaction config with the default
-transaction config recursively. Any non zero value fields will override the
+transaction config recursively. Any non-zero value fields will override the
 default config.
  */
 FOUNDATION_EXPORT NknTransactionConfig* _Nullable NknMergeTransactionConfig(NknTransactionConfig* _Nullable conf, NSError* _Nullable* _Nullable error);
@@ -1707,7 +1835,7 @@ optional client config. For any zero value field in config, the default
 client config value will be used. If config is nil, the default client config
 will be used.
  */
-FOUNDATION_EXPORT NknClient* _Nullable NknNewClient(NknAccount* _Nullable account, NSString* _Nullable identifier, NknClientConfig* _Nullable config, NSError* _Nullable* _Nullable error);
+FOUNDATION_EXPORT NknClient* _Nullable NknNewClient(NknAccount* _Nullable account, NSString* _Nullable identifier, NknClientConfig* _Nullable cfg, NSError* _Nullable* _Nullable error);
 
 /**
  * NewClientAddr creates a ClientAddr from a client address string.
@@ -1728,7 +1856,7 @@ FOUNDATION_EXPORT NknMultiClient* _Nullable NknNewMultiClient(NknAccount* _Nulla
 
 /**
  * NewMultiClientV2 creates a MultiClient with an account, an optional identifier,
-and a optional client config. For any zero value field in config, the default
+and an optional client config. For any zero value field in config, the default
 client config value will be used. If config is nil, the default client config
 will be used.
  */
@@ -1751,6 +1879,12 @@ FOUNDATION_EXPORT NknOnError* _Nullable NknNewOnError(long size, id<NknOnErrorFu
 function.
  */
 FOUNDATION_EXPORT NknOnMessage* _Nullable NknNewOnMessage(long size, id<NknOnMessageFunc> _Nullable cb);
+
+/**
+ * NewOnMessageEvent creates an OnMessageEvent channel with a channel size and callback
+function.
+ */
+FOUNDATION_EXPORT NknOnMessageEvent* _Nullable NknNewOnMessageEvent(long size, id<NknOnMessageEventFunc> _Nullable cb);
 
 // skipped function NewReplyPayload with unsupported parameter or return types
 
@@ -1812,6 +1946,8 @@ FOUNDATION_EXPORT NknWallet* _Nullable NknWalletFromJSON(NSString* _Nullable wal
 
 @class NknOnErrorFunc;
 
+@class NknOnMessageEventFunc;
+
 @class NknOnMessageFunc;
 
 @class NknRPCConfigInterface;
@@ -1850,6 +1986,17 @@ FOUNDATION_EXPORT NknWallet* _Nullable NknWalletFromJSON(NSString* _Nullable wal
 
 - (nonnull instancetype)initWithRef:(_Nonnull id)ref;
 - (void)onError:(NSError* _Nullable)p0;
+@end
+
+/**
+ * OnMessageEventFunc is a wrapper type for gomobile compatibility.
+ */
+@interface NknOnMessageEventFunc : NSObject <goSeqRefInterface, NknOnMessageEventFunc> {
+}
+@property(strong, readonly) _Nonnull id _ref;
+
+- (nonnull instancetype)initWithRef:(_Nonnull id)ref;
+- (void)onMessageEvent:(NknMessageEvent* _Nullable)p0;
 @end
 
 /**
